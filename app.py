@@ -18,7 +18,7 @@ DEFAULT_EMAIL = "jeanpieokundji249@gmail.com"
 DEFAULT_FACEBOOK_PAGE = "Jean.pie.lange.okundji"
 
 MOBILE_MONEY_NUMBERS = {
-    'M-Pesa': '+243 83 8862950',
+    'M-Pesa': '+243 83 8862 950',
     'Orange Money': '+243 89 000 0000',
     'Airtel Money': '+243 98 619 2491'
 }
