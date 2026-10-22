@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 import urllib.parse
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text
 
 app = Flask(__name__)
@@ -10,15 +12,15 @@ app.config['SECRET_KEY'] = 'locaservices_secret_key_2026'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///locaservices.db'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
-# Informations de contact par défaut
+# Informations de contact et numéros Mobile Money
 DEFAULT_WHATSAPP = "243986192491"
 DEFAULT_EMAIL = "jeanpieokundji249@gmail.com"
 DEFAULT_FACEBOOK_PAGE = "Jean.pie.lange.okundji"
 
 MOBILE_MONEY_NUMBERS = {
-    'M-Pesa': '+243 81 000 0000',
+    'M-Pesa': '+243 83 8862950',
     'Orange Money': '+243 89 000 0000',
-    'Airtel Money': '+243 98 6192 491'
+    'Airtel Money': '+243 98 619 2491'
 }
 
 db = SQLAlchemy(app)
@@ -44,9 +46,9 @@ class Booking(db.Model):
     listing_id = db.Column(db.Integer, db.ForeignKey('listing.id'), nullable=False)
     client_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     total_price = db.Column(db.Float, nullable=False)
-    commission = db.Column(db.Float, nullable=False)
+    commission = db.Column(db.Float, nullable=False) # 15%
     payment_status = db.Column(db.String(50), default='En attente')
-    transaction_id = db.Column(db.String(100), nullable=True)
+    transaction_id = db.Column(db.String(100), nullable=True) # Code SMS Mobile Money
     payment_method = db.Column(db.String(50), nullable=True)
 
 # Mise à jour automatique de la base de données sans perte de données
@@ -54,7 +56,6 @@ with app.app_context():
     db.create_all()
     inspector = inspect(db.engine)
     
-    # Vérifier et ajouter les nouvelles colonnes si elles manquent
     if 'listing' in inspector.get_table_names():
         columns = [c['name'] for c in inspector.get_columns('listing')]
         if 'boosted_until' not in columns:
@@ -92,7 +93,7 @@ def index():
     now = datetime.utcnow()
     listings = Listing.query.all()
     
-    # Desactiver les boosts expirés
+    # Désactiver les boosts expirés
     for listing in listings:
         if listing.is_boosted and listing.boosted_until and listing.boosted_until < now:
             listing.is_boosted = False
@@ -106,10 +107,10 @@ def reserve(listing_id):
     if 'user_id' not in session:
         flash("Veuillez vous connecter pour réserver.")
         return redirect(url_for('index'))
-    
+
     listing = Listing.query.get_or_404(listing_id)
     commission = listing.price * 0.15
-    
+
     new_booking = Booking(
         listing_id=listing.id,
         client_id=session['user_id'],
@@ -119,7 +120,7 @@ def reserve(listing_id):
     )
     db.session.add(new_booking)
     db.session.commit()
-    
+
     return redirect(url_for('pay_booking', booking_id=new_booking.id))
 
 @app.route('/pay/<int:booking_id>', methods=['GET', 'POST'])
@@ -130,10 +131,10 @@ def pay_booking(booking_id):
         booking.transaction_id = request.form.get('transaction_id')
         booking.payment_status = 'Paiement sous vérification'
         db.session.commit()
-        
-        flash("Référence enregistrée. Validation en cours.")
+
+        flash("Votre référence de paiement a été soumise avec succès ! Validation en cours.")
         return redirect(url_for('dashboard'))
-        
+
     return render_template('pay.html', booking=booking, numbers=MOBILE_MONEY_NUMBERS)
 
 @app.route('/dashboard')
@@ -144,4 +145,5 @@ def dashboard():
     return render_template('dashboard.html', bookings=user_bookings)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
